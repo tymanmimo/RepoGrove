@@ -1,9 +1,18 @@
 import { Octokit } from "octokit";
 
-const token = process.env.GITHUB_TOKEN?.trim();
-const octokit = new Octokit(token ? { auth: token } : {});
+function createGitHubClient(token?: string | null) {
+  const normalizedToken = token?.trim();
+  return new Octokit(normalizedToken ? { auth: normalizedToken } : {});
+}
 
-export async function fetchGitHubData(username: string) {
+export async function validateGitHubToken(token: string): Promise<string> {
+  const octokit = createGitHubClient(token);
+  const response = await octokit.rest.users.getAuthenticated();
+  return response.data.login;
+}
+
+export async function fetchGitHubData(username: string, token?: string | null) {
+  const octokit = createGitHubClient(token);
   const [profileResponse, repositories] = await Promise.all([
     octokit.rest.users.getByUsername({ username }),
     octokit.paginate(octokit.rest.repos.listForUser, {

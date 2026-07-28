@@ -4,19 +4,30 @@ import Spinner from "ink-spinner";
 import TextInput from "ink-text-input";
 
 import { analyzeGitHubData, type ProfileStatistics } from "./analyzer.js";
+import { systemTokenStore, type TokenStore } from "./credentials.js";
 import { formatError } from "./errors.js";
-import { fetchGitHubData } from "./github.js";
+import { fetchGitHubData, validateGitHubToken } from "./github.js";
+import { TokenSetup } from "./token-setup.js";
 
 const { useState } = React;
 
-type Screen = "search" | "loading" | "result" | "error";
+type Screen = "authentication" | "search" | "loading" | "result" | "error";
 
 export interface AppProps {
-  fetchStatistics?: (username: string) => Promise<ProfileStatistics>;
+  environmentToken?: string | null;
+  tokenStore?: TokenStore;
+  validateToken?: (token: string) => Promise<string>;
+  fetchStatistics?: (
+    username: string,
+    token: string | null,
+  ) => Promise<ProfileStatistics>;
 }
 
-async function loadStatistics(username: string): Promise<ProfileStatistics> {
-  const data = await fetchGitHubData(username);
+async function loadStatistics(
+  username: string,
+  token: string | null,
+): Promise<ProfileStatistics> {
+  const data = await fetchGitHubData(username, token);
   return analyzeGitHubData(data);
 }
 
@@ -33,18 +44,25 @@ function Header() {
 
 function SearchScreen({
   username,
+  authenticated,
   onChange,
   onSubmit,
 }: {
   username: string;
+  authenticated: boolean;
   onChange: (value: string) => void;
   onSubmit: (value: string) => void;
 }) {
   return (
     <Box borderStyle="round" borderColor="magenta" flexDirection="column" paddingX={1}>
-      <Text bold color="magentaBright">
-        Search GitHub profiles
-      </Text>
+      <Box justifyContent="space-between">
+        <Text bold color="magentaBright">
+          Search GitHub profiles
+        </Text>
+        <Text color={authenticated ? "green" : "yellow"}>
+          {authenticated ? "Authenticated" : "Anonymous"}
+        </Text>
+      </Box>
       <Box marginTop={1}>
         <Text color="blueBright">{">"} </Text>
         <TextInput
@@ -163,9 +181,15 @@ function ErrorScreen({ message }: { message: string }) {
   );
 }
 
-export function App({ fetchStatistics = loadStatistics }: AppProps) {
+export function App({
+  environmentToken = process.env.GITHUB_TOKEN?.trim() || null,
+  tokenStore = systemTokenStore,
+  validateToken = validateGitHubToken,
+  fetchStatistics = loadStatistics,
+}: AppProps) {
   const { exit } = useApp();
-  const [screen, setScreen] = useState<Screen>("search");
+  const [screen, setScreen] = useState<Screen>("authentication");
+  const [activeToken, setActiveToken] = useState<string | null>(null);
   const [username, setUsername] = useState("");
   const [statistics, setStatistics] = useState<ProfileStatistics | null>(null);
   const [error, setError] = useState("");
@@ -198,7 +222,7 @@ export function App({ fetchStatistics = loadStatistics }: AppProps) {
     setScreen("loading");
 
     try {
-      const result = await fetchStatistics(normalizedUsername);
+      const result = await fetchStatistics(normalizedUsername, activeToken);
       setStatistics(result);
       setScreen("result");
     } catch (searchError) {
@@ -210,8 +234,24 @@ export function App({ fetchStatistics = loadStatistics }: AppProps) {
   return (
     <Box flexDirection="column" paddingX={1}>
       <Header />
+      {screen === "authentication" && (
+        <TokenSetup
+          environmentToken={environmentToken}
+          tokenStore={tokenStore}
+          validateToken={validateToken}
+          onComplete={(token) => {
+            setActiveToken(token);
+            setScreen("search");
+          }}
+        />
+      )}
       {screen === "search" && (
-        <SearchScreen username={username} onChange={setUsername} onSubmit={search} />
+        <SearchScreen
+          username={username}
+          authenticated={Boolean(activeToken)}
+          onChange={setUsername}
+          onSubmit={search}
+        />
       )}
       {screen === "loading" && <LoadingScreen username={username} />}
       {screen === "result" && statistics && <Dashboard statistics={statistics} />}
