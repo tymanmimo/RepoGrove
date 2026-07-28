@@ -52,6 +52,21 @@ if (!username) {
         );
       }
     }
+
+    if (statistics.activeProjects.length === 0) {
+      console.log("Active projects: No active projects available.");
+    } else {
+      console.log("Active projects:");
+
+      for (const project of statistics.activeProjects) {
+        const starLabel = project.starCount === 1 ? "star" : "stars";
+        const updatedAt = project.updatedAt?.slice(0, 10) ?? "Unknown";
+        console.log(
+          `  ${project.name} | ${project.language ?? "Unknown"} | ${project.starCount} ${starLabel} | ${updatedAt}`,
+        );
+        console.log(`    ${project.url}`);
+      }
+    }
   } catch (error) {
     console.error(formatError(error));
     process.exitCode = 1;

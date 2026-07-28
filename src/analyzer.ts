@@ -6,11 +6,20 @@ export interface LanguageStatistics {
   percentage: number;
 }
 
+export interface ActiveProject {
+  name: string;
+  language: string | null;
+  starCount: number;
+  url: string;
+  updatedAt: string | null;
+}
+
 export interface ProfileStatistics {
   username: string;
   repositoryCount: number;
   starCount: number;
   languages: LanguageStatistics[];
+  activeProjects: ActiveProject[];
 }
 
 export function analyzeGitHubData({
@@ -46,11 +55,25 @@ export function analyzeGitHubData({
         second.repositoryCount - first.repositoryCount ||
         first.name.localeCompare(second.name),
     );
+  const activeProjects = repositories
+    .filter((repository) => !repository.fork && !repository.archived)
+    .sort((first, second) =>
+      (second.updated_at ?? "").localeCompare(first.updated_at ?? ""),
+    )
+    .slice(0, 5)
+    .map((repository) => ({
+      name: repository.name,
+      language: repository.language ?? null,
+      starCount: repository.stargazers_count ?? 0,
+      url: repository.html_url,
+      updatedAt: repository.updated_at ?? null,
+    }));
 
   return {
     username: profile.login,
     repositoryCount: profile.public_repos,
     starCount,
     languages,
+    activeProjects,
   };
 }
