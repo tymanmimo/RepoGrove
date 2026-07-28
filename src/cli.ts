@@ -1,8 +1,12 @@
 #!/usr/bin/env node
 
+import chalk from "chalk";
+import { Command } from "commander";
 import { RequestError } from "octokit";
+import ora from "ora";
 
 import { analyzeGitHubData } from "./analyzer.js";
+import { formatStatistics } from "./formatter.js";
 import { fetchGitHubData } from "./github.js";
 
 function formatError(error: unknown): string {
@@ -25,50 +29,30 @@ function formatError(error: unknown): string {
   return `GitHub API request failed: ${error.message}`;
 }
 
-const username = process.argv[2]?.trim();
+const program = new Command()
+  .name("github-analyzer")
+  .description("Analyze a public GitHub profile")
+  .version("0.1.0")
+  .argument("<username>", "GitHub username to analyze")
+  .showHelpAfterError()
+  .configureOutput({
+    outputError: (message, write) => write(chalk.red(message)),
+  })
+  .action(async (username: string) => {
+    const spinner = ora({
+      text: `Fetching @${username.trim()}...`,
+      color: "blue",
+    }).start();
 
-if (!username) {
-  console.error("Usage: github-analyzer <username>");
-  process.exitCode = 1;
-} else {
-  try {
-    const data = await fetchGitHubData(username);
-    const statistics = analyzeGitHubData(data);
-
-    console.log(`GitHub profile: @${statistics.username}`);
-    console.log(`Public repositories: ${statistics.repositoryCount}`);
-    console.log(`Total stars: ${statistics.starCount}`);
-
-    if (statistics.languages.length === 0) {
-      console.log("Languages: No language data available.");
-    } else {
-      console.log("Languages:");
-
-      for (const language of statistics.languages) {
-        const repositoryLabel =
-          language.repositoryCount === 1 ? "repository" : "repositories";
-        console.log(
-          `  ${language.name}: ${language.repositoryCount} ${repositoryLabel} (${language.percentage}%)`,
-        );
-      }
+    try {
+      const data = await fetchGitHubData(username.trim());
+      const statistics = analyzeGitHubData(data);
+      spinner.succeed(chalk.blueBright("Profile loaded"));
+      console.log(`\n${formatStatistics(statistics)}`);
+    } catch (error) {
+      spinner.fail(chalk.red(formatError(error)));
+      process.exitCode = 1;
     }
+  });
 
-    if (statistics.activeProjects.length === 0) {
-      console.log("Active projects: No active projects available.");
-    } else {
-      console.log("Active projects:");
-
-      for (const project of statistics.activeProjects) {
-        const starLabel = project.starCount === 1 ? "star" : "stars";
-        const updatedAt = project.updatedAt?.slice(0, 10) ?? "Unknown";
-        console.log(
-          `  ${project.name} | ${project.language ?? "Unknown"} | ${project.starCount} ${starLabel} | ${updatedAt}`,
-        );
-        console.log(`    ${project.url}`);
-      }
-    }
-  } catch (error) {
-    console.error(formatError(error));
-    process.exitCode = 1;
-  }
-}
+await program.parseAsync(process.argv);

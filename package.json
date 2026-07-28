@@ -22,6 +22,10 @@
     "typescript": "^7.0.2"
   },
   "dependencies": {
-    "octokit": "^5.0.5"
+    "chalk": "^6.0.0",
+    "cli-table3": "^0.6.5",
+    "commander": "^15.0.0",
+    "octokit": "^5.0.5",
+    "ora": "^9.4.1"
   }
 }
