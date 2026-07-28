@@ -1,5 +1,5 @@
 import * as React from "react";
-import { Box, useApp, useInput } from "ink";
+import { useInput, useWindowSize } from "ink";
 
 import { analyzeProfile, type ProfileStatistics } from "../core/profile-analyzer.js";
 import { fetchGitHubData, validateGitHubToken } from "../github/client.js";
@@ -10,36 +10,22 @@ import {
   type SearchHistoryEntry,
 } from "../storage/history-store.js";
 import { systemTokenStore, type TokenStore } from "../storage/token-store.js";
-import { Header } from "./components/header.js";
-import {
-  HistoryMenu,
-  type HistoryAction,
-} from "./screens/history-menu.js";
-import { MainMenu, type MainMenuAction } from "./screens/main-menu.js";
-import {
-  LoadingScreen,
-  ProfileDashboard,
-  SearchErrorScreen,
-  SearchScreen,
-} from "./screens/profile-screens.js";
 import { TokenSetup } from "./screens/token-setup.js";
+import { WelcomeScreen } from "./screens/welcome-screen.js";
+import type { TerminalSize, WorkspaceFocus } from "./types.js";
+import type { HistoryAction } from "./workspace/history-sidebar.js";
+import type { ResultStatus } from "./workspace/results-panel.js";
+import { Workspace } from "./workspace/workspace.js";
 
 const { useEffect, useRef, useState } = React;
 
-type Screen =
-  | "authentication"
-  | "menu"
-  | "token-settings"
-  | "history"
-  | "search"
-  | "loading"
-  | "result"
-  | "error";
+type Screen = "welcome" | "workspace";
 
 export interface AppProps {
   environmentToken?: string | null;
   tokenStore?: TokenStore;
   historyStore?: HistoryStore;
+  terminalSize?: TerminalSize;
   validateToken?: (token: string, signal?: AbortSignal) => Promise<void>;
   fetchStatistics?: (
     username: string,
@@ -61,15 +47,20 @@ export function App({
   environmentToken = process.env.GITHUB_TOKEN?.trim() || null,
   tokenStore = systemTokenStore,
   historyStore = localHistoryStore,
+  terminalSize,
   validateToken = validateGitHubToken,
   fetchStatistics = loadStatistics,
 }: AppProps) {
-  const { exit } = useApp();
-  const [screen, setScreen] = useState<Screen>("authentication");
+  const windowSize = useWindowSize();
+  const size = terminalSize ?? windowSize;
+  const [screen, setScreen] = useState<Screen>("welcome");
+  const [welcomeCanCancel, setWelcomeCanCancel] = useState(false);
+  const [focus, setFocus] = useState<WorkspaceFocus>("search");
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
   const [historyError, setHistoryError] = useState("");
   const [username, setUsername] = useState("");
+  const [status, setStatus] = useState<ResultStatus>("idle");
   const [statistics, setStatistics] = useState<ProfileStatistics | null>(null);
   const [error, setError] = useState("");
   const mountedRef = useRef(true);
@@ -77,6 +68,7 @@ export function App({
   const searchControllerRef = useRef<AbortController | null>(null);
   const searchingRef = useRef(false);
   const historyRevisionRef = useRef(0);
+  const suppressInputRef = useRef(false);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -112,67 +104,37 @@ export function App({
 
   useInput(
     (input, key) => {
-      if (
-        input === "q" &&
-        (screen === "menu" ||
-          screen === "history" ||
-          screen === "result" ||
-          screen === "error")
-      ) {
-        exit();
+      if (key.tab) {
+        setFocus((current) => (current === "search" ? "history" : "search"));
+        return;
       }
 
-      if (key.escape && (screen === "search" || screen === "history")) {
-        setScreen("menu");
+      if (key.ctrl && input === "t") {
+        const preservedUsername = username;
+        suppressInputRef.current = true;
+        queueMicrotask(() => {
+          setUsername(preservedUsername);
+          suppressInputRef.current = false;
+        });
+        setWelcomeCanCancel(true);
+        setScreen("welcome");
+        return;
       }
 
-      if (key.escape && screen === "loading") {
+      if (key.escape && status === "loading") {
         requestIdRef.current += 1;
         searchControllerRef.current?.abort();
         searchingRef.current = false;
-        setScreen("search");
-      }
-
-      if (input === "r" && (screen === "result" || screen === "error")) {
-        setUsername("");
-        setStatistics(null);
-        setError("");
-        setScreen("search");
-      }
-
-      if (input === "m" && (screen === "result" || screen === "error")) {
-        setScreen("menu");
+        setStatus(statistics ? "result" : "idle");
       }
     },
-    {
-      isActive:
-        screen === "menu" ||
-        screen === "history" ||
-        screen === "search" ||
-        screen === "loading" ||
-        screen === "result" ||
-        screen === "error",
-    },
+    { isActive: screen === "workspace" },
   );
 
-  const selectMainMenu = (action: MainMenuAction) => {
-    if (action === "exit") {
-      exit();
-      return;
+  const changeUsername = (value: string) => {
+    if (!suppressInputRef.current) {
+      setUsername(value);
     }
-
-    if (action === "search") {
-      setUsername("");
-      setScreen("search");
-      return;
-    }
-
-    if (action === "history") {
-      setScreen("history");
-      return;
-    }
-
-    setScreen("token-settings");
   };
 
   const search = async (value: string) => {
@@ -187,7 +149,8 @@ export function App({
     const controller = new AbortController();
     searchControllerRef.current = controller;
     setUsername(normalizedUsername);
-    setScreen("loading");
+    setError("");
+    setStatus("loading");
 
     try {
       const result = await fetchStatistics(
@@ -205,7 +168,7 @@ export function App({
       }
 
       setStatistics(result);
-      setScreen("result");
+      setStatus("result");
 
       try {
         historyRevisionRef.current += 1;
@@ -227,7 +190,7 @@ export function App({
         !controller.signal.aborted
       ) {
         setError(formatError(searchError));
-        setScreen("error");
+        setStatus("error");
       }
     } finally {
       if (requestId === requestIdRef.current) {
@@ -239,12 +202,8 @@ export function App({
 
   const selectHistory = async (action: HistoryAction) => {
     if (action.type === "search") {
+      setFocus("search");
       await search(action.username);
-      return;
-    }
-
-    if (action.type === "back") {
-      setScreen("menu");
       return;
     }
 
@@ -260,7 +219,9 @@ export function App({
 
   const completeTokenSetup = (token: string | null) => {
     setActiveToken(token);
-    setScreen("menu");
+    setWelcomeCanCancel(false);
+    setScreen("workspace");
+    setFocus("search");
   };
 
   const tokenSetupProps = {
@@ -271,37 +232,33 @@ export function App({
     onTokenChange: setActiveToken,
   };
 
+  if (screen === "welcome") {
+    return (
+      <WelcomeScreen size={size}>
+        <TokenSetup
+          {...tokenSetupProps}
+          {...(welcomeCanCancel
+            ? { onCancel: () => setScreen("workspace") }
+            : {})}
+        />
+      </WelcomeScreen>
+    );
+  }
+
   return (
-    <Box flexDirection="column" paddingX={1}>
-      <Header />
-      {screen === "authentication" && <TokenSetup {...tokenSetupProps} />}
-      {screen === "menu" && (
-        <MainMenu
-          authenticated={Boolean(activeToken)}
-          historyCount={history.length}
-          historyError={historyError}
-          onSelect={selectMainMenu}
-        />
-      )}
-      {screen === "token-settings" && (
-        <TokenSetup {...tokenSetupProps} onCancel={() => setScreen("menu")} />
-      )}
-      {screen === "history" && (
-        <HistoryMenu entries={history} error={historyError} onSelect={selectHistory} />
-      )}
-      {screen === "search" && (
-        <SearchScreen
-          username={username}
-          authenticated={Boolean(activeToken)}
-          onChange={setUsername}
-          onSubmit={search}
-        />
-      )}
-      {screen === "loading" && <LoadingScreen username={username} />}
-      {screen === "result" && statistics && (
-        <ProfileDashboard statistics={statistics} />
-      )}
-      {screen === "error" && <SearchErrorScreen message={error} />}
-    </Box>
+    <Workspace
+      size={size}
+      focus={focus}
+      history={history}
+      historyError={historyError}
+      username={username}
+      authenticated={Boolean(activeToken)}
+      status={status}
+      statistics={statistics}
+      error={error}
+      onHistorySelect={selectHistory}
+      onUsernameChange={changeUsername}
+      onSearch={search}
+    />
   );
 }

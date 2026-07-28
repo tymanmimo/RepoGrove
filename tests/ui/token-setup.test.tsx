@@ -47,7 +47,7 @@ describe("TokenSetup", () => {
     );
     const token = "github_pat_secret";
 
-    await waitForText(view.lastFrame, "Add a GitHub token");
+    await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Enter GitHub token");
     view.stdin.write(token);
@@ -107,7 +107,7 @@ describe("TokenSetup", () => {
     );
     await waitForText(deleteView.lastFrame, "Delete saved token");
     deleteView.stdin.write("3");
-    await waitForText(deleteView.lastFrame, "Add a GitHub token");
+    await waitForText(deleteView.lastFrame, "Add GITHUB_TOKEN");
 
     assert.equal(state.token, null);
     assert.equal(state.deleteCount, 1);
@@ -126,7 +126,7 @@ describe("TokenSetup", () => {
       />,
     );
 
-    await waitForText(view.lastFrame, "Add a GitHub token");
+    await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Enter GitHub token");
     view.stdin.write("invalid-token");
@@ -161,7 +161,7 @@ describe("TokenSetup", () => {
       />,
     );
 
-    await waitForText(view.lastFrame, "Add a GitHub token");
+    await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Enter GitHub token");
     view.stdin.write("secret-token");

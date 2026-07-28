@@ -13,7 +13,7 @@
     "dev": "tsx src/cli.ts",
     "lint": "eslint .",
     "start": "node dist/cli.js",
-    "test": "tsx --test tests/core/profile-analyzer.test.ts tests/github/errors.test.ts tests/storage/history-store.test.ts tests/ui/app.test.tsx tests/ui/token-setup.test.tsx",
+    "test": "tsx --test tests/core/profile-analyzer.test.ts tests/github/errors.test.ts tests/storage/history-store.test.ts tests/ui/app.test.tsx tests/ui/token-setup.test.tsx tests/ui/workspace.test.ts",
     "typecheck": "tsc --noEmit && tsc -p tests/tsconfig.json"
   },
   "engines": {

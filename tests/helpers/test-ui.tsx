@@ -52,7 +52,5 @@ export async function typeText(
 }
 
 export async function openSearch(view: ReturnType<typeof render>) {
-  await waitForText(view.lastFrame, "Main menu");
-  view.stdin.write("1");
-  await waitForText(view.lastFrame, "Search GitHub profiles");
+  await waitForText(view.lastFrame, "Search Account");
 }

@@ -9,6 +9,8 @@ import { App } from "./ui/app.js";
 
 const require = createRequire(import.meta.url);
 const { version } = require("../package.json") as { version: string };
+const enterAlternateScreen = "\u001B[?1049h";
+const leaveAlternateScreen = "\u001B[?1049l";
 
 const program = new Command()
   .name("github-analyzer")
@@ -23,8 +25,14 @@ const program = new Command()
       return;
     }
 
-    const app = render(createElement(App));
-    await app.waitUntilExit();
+    process.stdout.write(enterAlternateScreen);
+
+    try {
+      const app = render(createElement(App));
+      await app.waitUntilExit();
+    } finally {
+      process.stdout.write(leaveAlternateScreen);
+    }
   });
 
 await program.parseAsync(process.argv);

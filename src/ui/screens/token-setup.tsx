@@ -1,11 +1,15 @@
 import * as React from "react";
 import { Box, Text, useInput } from "ink";
-import SelectInput from "ink-select-input";
+import SelectInput, {
+  type IndicatorProps,
+  type ItemProps,
+} from "ink-select-input";
 import Spinner from "ink-spinner";
 import TextInput from "ink-text-input";
 
 import { formatError } from "../../github/errors.js";
 import type { TokenStore } from "../../storage/token-store.js";
+import { theme } from "../theme.js";
 
 const { useEffect, useRef, useState } = React;
 const operationTimeout = 15_000;
@@ -22,6 +26,14 @@ interface TokenSetupProps {
   onCancel?: () => void;
 }
 
+function TokenIndicator({ isSelected }: IndicatorProps) {
+  return <Text color={theme.accent}>{isSelected ? ">" : " "} </Text>;
+}
+
+function TokenItem({ isSelected, label }: ItemProps) {
+  return <Text color={isSelected ? theme.bright : theme.muted}>{label}</Text>;
+}
+
 function BusyScreen({
   message,
   cancellable = true,
@@ -30,8 +42,8 @@ function BusyScreen({
   cancellable?: boolean;
 }) {
   return (
-    <Box borderStyle="round" borderColor="blue" flexDirection="column" paddingX={1}>
-      <Text color="blueBright">
+    <Box borderStyle="round" borderColor={theme.border} flexDirection="column" paddingX={1}>
+      <Text color={theme.accent}>
         <Spinner type="dots" /> {message}
       </Text>
       {cancellable && <Text dimColor>Esc cancel</Text>}
@@ -146,7 +158,7 @@ export function TokenSetup({
           value: "use",
         },
         {
-          label: tokenSource === "saved" ? "Replace saved token" : "Save a new token",
+          label: tokenSource === "saved" ? "Replace saved token" : "Save a new GITHUB_TOKEN",
           value: "replace",
         },
         ...(tokenSource === "saved"
@@ -164,7 +176,7 @@ export function TokenSetup({
       ]
     : [
         {
-          label: "Add a GitHub token",
+          label: "Add GITHUB_TOKEN",
           value: "replace",
         },
         {
@@ -177,7 +189,7 @@ export function TokenSetup({
     ...(onCancel
       ? [
           {
-            label: "Back to main menu",
+            label: "Back to workspace",
             value: "back" as const,
           },
         ]
@@ -343,13 +355,13 @@ export function TokenSetup({
 
   if (screen === "input") {
     return (
-      <Box borderStyle="round" borderColor="magenta" flexDirection="column" paddingX={1}>
-        <Text bold color="magentaBright">
+      <Box borderStyle="round" borderColor={theme.primary} flexDirection="column" paddingX={1}>
+        <Text bold color={theme.bright}>
           Enter GitHub token
         </Text>
         <Text dimColor>The token is validated before it is saved.</Text>
         <Box marginTop={1}>
-          <Text color="blueBright">{">"} </Text>
+          <Text color={theme.accent}>{">"} </Text>
           <TextInput
             value={tokenInput}
             onChange={setTokenInput}
@@ -358,7 +370,7 @@ export function TokenSetup({
             mask="*"
           />
         </Box>
-        {tokenError && <Text color="redBright">{tokenError}</Text>}
+        {tokenError && <Text color={theme.error}>{tokenError}</Text>}
         <Box marginTop={1}>
           <Text dimColor>Enter validate and save  Esc back</Text>
         </Box>
@@ -367,14 +379,19 @@ export function TokenSetup({
   }
 
   return (
-    <Box borderStyle="round" borderColor="magenta" flexDirection="column" paddingX={1}>
-      <Text bold color="magentaBright">
-        GitHub authentication
+    <Box borderStyle="round" borderColor={theme.primary} flexDirection="column" paddingX={1}>
+      <Text bold color={theme.bright}>
+        GITHUB_TOKEN Setup
       </Text>
       <Text dimColor>A token increases the API limit and is stored securely.</Text>
-      {storageError && <Text color="yellow">{storageError}</Text>}
+      {storageError && <Text color={theme.warning}>{storageError}</Text>}
       <Box marginTop={1}>
-        <SelectInput items={items} onSelect={(item) => selectMode(item.value)} />
+        <SelectInput
+          items={items}
+          indicatorComponent={TokenIndicator}
+          itemComponent={TokenItem}
+          onSelect={(item) => selectMode(item.value)}
+        />
       </Box>
     </Box>
   );

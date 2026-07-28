@@ -3,9 +3,9 @@ import { afterEach, describe, it } from "node:test";
 
 import { cleanup } from "ink-testing-library";
 
+import type { HistoryStore } from "../../src/storage/history-store.js";
 import { profileStatistics } from "../fixtures/profile-statistics.js";
 import { createHistoryStore, createTokenStore } from "../helpers/stores.js";
-import type { HistoryStore } from "../../src/storage/history-store.js";
 import {
   openSearch,
   renderApp,
@@ -15,21 +15,34 @@ import {
 
 afterEach(cleanup);
 
+async function useSavedToken(view: ReturnType<typeof renderApp>) {
+  await waitForText(view.lastFrame, "Use saved token");
+  view.stdin.write("\r");
+  await openSearch(view);
+}
+
+async function openTokenSettings(view: ReturnType<typeof renderApp>) {
+  view.stdin.write("\u0014");
+  await waitForText(view.lastFrame, "GITHUB_TOKEN Setup");
+}
+
 describe("App", () => {
-  it("continues in anonymous mode", async () => {
+  it("moves from welcome to an anonymous workspace", async () => {
     const view = renderApp();
 
-    await waitForText(view.lastFrame, "Add a GitHub token");
+    await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     view.stdin.write("j");
     await waitForText(view.lastFrame, "Continue without a token");
     view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Main menu");
+    await waitForText(view.lastFrame, "Search Account");
 
-    assert.match(view.lastFrame() ?? "", /Anonymous/);
-    view.unmount();
+    const frame = view.lastFrame() ?? "";
+    assert.match(frame, /Search History/);
+    assert.match(frame, /Anonymous/);
+    assert.match(frame, /Search for a GitHub account to begin/);
   });
 
-  it("uses the saved token and records a successful search", async () => {
+  it("searches with a saved token and updates the sidebar", async () => {
     const { store } = createTokenStore("saved-token");
     const history = createHistoryStore();
     let receivedToken: string | null = null;
@@ -42,46 +55,35 @@ describe("App", () => {
       },
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await openSearch(view);
+    await useSavedToken(view);
     await typeText(view, "octocat");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Active Projects");
 
     assert.equal(receivedToken, "saved-token");
-    assert.match(view.lastFrame() ?? "", /@octocat/);
-    assert.match(view.lastFrame() ?? "", /hello-world/);
-
-    view.stdin.write("m");
-    await waitForText(view.lastFrame, "Search history (1)");
     assert.equal(history.state.entries[0]?.username, "octocat");
-
-    view.unmount();
+    assert.match(view.lastFrame() ?? "", /hello-world/);
   });
 
-  it("shows a profile error and returns to search", async () => {
+  it("shows errors inside the workspace", async () => {
     const { store } = createTokenStore("saved-token");
     const view = renderApp({
       tokenStore: store,
       fetchStatistics: async () => Promise.reject(new Error("Network error")),
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await openSearch(view);
+    await useSavedToken(view);
     await typeText(view, "missing-user");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Search failed");
-    assert.match(view.lastFrame() ?? "", /unexpected error/);
 
-    view.stdin.write("r");
-    await waitForText(view.lastFrame, "Search GitHub profiles");
-
-    view.unmount();
+    const frame = view.lastFrame() ?? "";
+    assert.match(frame, /unexpected error/);
+    assert.match(frame, /Search Account/);
+    assert.match(frame, /Search History/);
   });
 
-  it("repeats a search from persistent history", async () => {
+  it("switches focus and repeats a search from history", async () => {
     const { store: tokenStore } = createTokenStore("saved-token");
     const history = createHistoryStore([
       {
@@ -99,20 +101,17 @@ describe("App", () => {
       },
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Search history (1)");
-    view.stdin.write("2");
+    await useSavedToken(view);
     await waitForText(view.lastFrame, "octocat");
+    view.stdin.write("\t");
+    await new Promise((resolve) => setTimeout(resolve, 50));
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Active Projects");
 
     assert.equal(searchedUsername, "octocat");
-    assert.equal(history.state.entries[0]?.username, "octocat");
-    view.unmount();
   });
 
-  it("clears search history", async () => {
+  it("clears history from the sidebar", async () => {
     const { store: tokenStore } = createTokenStore("saved-token");
     const history = createHistoryStore([
       {
@@ -120,37 +119,31 @@ describe("App", () => {
         searchedAt: "2026-07-27T12:00:00.000Z",
       },
     ]);
-    const view = renderApp({
-      tokenStore,
-      historyStore: history.store,
-    });
+    const view = renderApp({ tokenStore, historyStore: history.store });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Search history (1)");
-    view.stdin.write("2");
-    await waitForText(view.lastFrame, "Clear history");
+    await useSavedToken(view);
+    view.stdin.write("\t");
+    await new Promise((resolve) => setTimeout(resolve, 50));
     view.stdin.write("2");
     await waitForText(view.lastFrame, "No searches yet.");
 
     assert.deepEqual(history.state.entries, []);
     assert.equal(history.state.clearCount, 1);
-    view.unmount();
   });
 
-  it("opens token settings and returns to the main menu", async () => {
+  it("opens token settings with Ctrl+T and returns to the workspace", async () => {
     const { store } = createTokenStore("saved-token");
     const view = renderApp({ tokenStore: store });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Token settings");
-    view.stdin.write("3");
-    await waitForText(view.lastFrame, "Back to main menu");
+    await useSavedToken(view);
+    await typeText(view, "octo");
+    await openTokenSettings(view);
+    await waitForText(view.lastFrame, "Back to workspace");
     view.stdin.write("\u001B");
-    await waitForText(view.lastFrame, "Main menu");
+    await waitForText(view.lastFrame, "Search Account");
 
-    view.unmount();
+    assert.match(view.lastFrame() ?? "", /octo/);
+    assert.doesNotMatch(view.lastFrame() ?? "", /octot/);
   });
 
   it("clears the active token after deleting saved credentials", async () => {
@@ -164,24 +157,19 @@ describe("App", () => {
       },
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Token settings");
-    view.stdin.write("3");
+    await useSavedToken(view);
+    await openTokenSettings(view);
     await waitForText(view.lastFrame, "Delete saved token");
     view.stdin.write("3");
-    await waitForText(view.lastFrame, "Add a GitHub token");
+    await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     view.stdin.write("\u001B");
-    await waitForText(view.lastFrame, "Main menu");
+    await waitForText(view.lastFrame, "Search Account");
     assert.match(view.lastFrame() ?? "", /Anonymous/);
 
-    await openSearch(view);
     await typeText(view, "octocat");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Active Projects");
     assert.equal(receivedToken, null);
-
-    view.unmount();
   });
 
   it("falls back to the environment token after deleting saved credentials", async () => {
@@ -196,23 +184,18 @@ describe("App", () => {
       },
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await waitForText(view.lastFrame, "Token settings");
-    view.stdin.write("3");
+    await useSavedToken(view);
+    await openTokenSettings(view);
     await waitForText(view.lastFrame, "Delete saved token");
     view.stdin.write("3");
     await waitForText(view.lastFrame, "Use environment token");
     view.stdin.write("\u001B");
-    await waitForText(view.lastFrame, "Main menu");
-
-    await openSearch(view);
+    await waitForText(view.lastFrame, "Search Account");
     await typeText(view, "octocat");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Active Projects");
-    assert.equal(receivedToken, "environment-token");
 
-    view.unmount();
+    assert.equal(receivedToken, "environment-token");
   });
 
   it("prevents duplicate searches and cancels loading with Escape", async () => {
@@ -234,9 +217,7 @@ describe("App", () => {
       },
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await openSearch(view);
+    await useSavedToken(view);
     await typeText(view, "octocat");
     view.stdin.write("\r");
     view.stdin.write("\r");
@@ -244,10 +225,8 @@ describe("App", () => {
     assert.equal(requestCount, 1);
 
     view.stdin.write("\u001B");
-    await waitForText(view.lastFrame, "Search GitHub profiles");
+    await waitForText(view.lastFrame, "Search for a GitHub account to begin.");
     assert.equal(capturedSignal?.aborted, true);
-
-    view.unmount();
   });
 
   it("ignores a late search result after unmount", async () => {
@@ -263,9 +242,7 @@ describe("App", () => {
       fetchStatistics: async () => request,
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await openSearch(view);
+    await useSavedToken(view);
     await typeText(view, "octocat");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Fetching @octocat");
@@ -291,12 +268,7 @@ describe("App", () => {
         return startupHistory;
       },
       async add(username) {
-        return [
-          {
-            username,
-            searchedAt: "2026-07-28T12:00:00.000Z",
-          },
-        ];
+        return [{ username, searchedAt: "2026-07-28T12:00:00.000Z" }];
       },
       async clear() {},
     };
@@ -306,15 +278,10 @@ describe("App", () => {
       fetchStatistics: async () => profileStatistics,
     });
 
-    await waitForText(view.lastFrame, "Use saved token");
-    view.stdin.write("\r");
-    await openSearch(view);
+    await useSavedToken(view);
     await typeText(view, "octocat");
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Active Projects");
-    view.stdin.write("m");
-    await waitForText(view.lastFrame, "Search history (1)");
-
     resolveLoad?.([
       {
         username: "stale-user",
@@ -322,10 +289,50 @@ describe("App", () => {
       },
     ]);
     await new Promise((resolve) => setTimeout(resolve, 50));
-    view.stdin.write("2");
-    await waitForText(view.lastFrame, "octocat");
 
     assert.doesNotMatch(view.lastFrame() ?? "", /stale-user/);
-    view.unmount();
+  });
+
+  it("adapts result details to compact and wide terminals", async () => {
+    const compactToken = createTokenStore("saved-token");
+    const compact = renderApp({
+      tokenStore: compactToken.store,
+      terminalSize: { columns: 30, rows: 12 },
+      fetchStatistics: async () => profileStatistics,
+    });
+
+    await useSavedToken(compact);
+    await typeText(compact, "octocat");
+    compact.stdin.write("\r");
+    await waitForText(compact.lastFrame, "@octocat");
+    assert.doesNotMatch(compact.lastFrame() ?? "", /https:\/\//);
+    compact.unmount();
+
+    const mediumToken = createTokenStore("saved-token");
+    const medium = renderApp({
+      tokenStore: mediumToken.store,
+      terminalSize: { columns: 50, rows: 20 },
+      fetchStatistics: async () => profileStatistics,
+    });
+
+    await useSavedToken(medium);
+    await typeText(medium, "octocat");
+    medium.stdin.write("\r");
+    await waitForText(medium.lastFrame, "@octocat");
+    assert.doesNotMatch(medium.lastFrame() ?? "", /https:\/\//);
+    medium.unmount();
+
+    const wideToken = createTokenStore("saved-token");
+    const wide = renderApp({
+      tokenStore: wideToken.store,
+      terminalSize: { columns: 100, rows: 40 },
+      fetchStatistics: async () => profileStatistics,
+    });
+
+    await useSavedToken(wide);
+    await typeText(wide, "octocat");
+    wide.stdin.write("\r");
+    await waitForText(wide.lastFrame, "Active Projects");
+    assert.match(wide.lastFrame() ?? "", /https:\/\/github.com/);
   });
 });
