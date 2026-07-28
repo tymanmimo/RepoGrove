@@ -28,6 +28,7 @@ export function createTokenStore(initialToken: string | null = null) {
 export function createHistoryStore(initialEntries: SearchHistoryEntry[] = []) {
   const state = {
     entries: [...initialEntries],
+    addCount: 0,
     clearCount: 0,
   };
   const store: HistoryStore = {
@@ -35,6 +36,7 @@ export function createHistoryStore(initialEntries: SearchHistoryEntry[] = []) {
       return state.entries;
     },
     async add(username) {
+      state.addCount += 1;
       state.entries = [
         {
           username,

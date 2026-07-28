@@ -66,14 +66,48 @@ describe("history store", () => {
     assert.equal(entries[9]?.username, "user-2");
   });
 
-  it("clears history and handles corrupted JSON", async () => {
+  it("rejects corrupted JSON and filters invalid entries", async () => {
     const directory = await createTemporaryDirectory();
     const filePath = join(directory, "history.json");
     const store = createHistoryStore(filePath);
     await writeFile(filePath, "not-json", "utf8");
 
-    assert.deepEqual(await store.load(), []);
+    await assert.rejects(store.load(), { name: "HistoryDataError" });
 
+    await writeFile(
+      filePath,
+      JSON.stringify([
+        { username: "  octocat  ", searchedAt: "2026-07-28T12:00:00.000Z" },
+        { username: "", searchedAt: "2026-07-28T12:00:00.000Z" },
+        { username: "github", searchedAt: "invalid" },
+      ]),
+      "utf8",
+    );
+
+    assert.deepEqual(await store.load(), [
+      { username: "octocat", searchedAt: "2026-07-28T12:00:00.000Z" },
+    ]);
+  });
+
+  it("serializes concurrent mutations", async () => {
+    const directory = await createTemporaryDirectory();
+    const filePath = join(directory, "history.json");
+    const store = createHistoryStore(filePath);
+
+    await Promise.all([store.add("first"), store.add("second")]);
+    assert.deepEqual(
+      (await store.load()).map((entry) => entry.username),
+      ["second", "first"],
+    );
+
+    await Promise.all([store.add("third"), store.clear()]);
+    assert.deepEqual(await store.load(), []);
+  });
+
+  it("clears history", async () => {
+    const directory = await createTemporaryDirectory();
+    const filePath = join(directory, "history.json");
+    const store = createHistoryStore(filePath);
     await store.add("octocat");
     assert.match(await readFile(filePath, "utf8"), /octocat/);
 

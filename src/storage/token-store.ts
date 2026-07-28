@@ -2,9 +2,9 @@ const service = "github-analyzer";
 const account = "github-token";
 
 export interface TokenStore {
-  getToken(): Promise<string | null>;
-  saveToken(token: string): Promise<void>;
-  deleteToken(): Promise<void>;
+  getToken(signal?: AbortSignal): Promise<string | null>;
+  saveToken(token: string, signal?: AbortSignal): Promise<void>;
+  deleteToken(signal?: AbortSignal): Promise<void>;
 }
 
 async function createEntry() {
@@ -13,16 +13,16 @@ async function createEntry() {
 }
 
 export const systemTokenStore: TokenStore = {
-  async getToken() {
+  async getToken(signal) {
     const entry = await createEntry();
-    return (await entry.getPassword()) ?? null;
+    return (await entry.getPassword(signal))?.trim() || null;
   },
-  async saveToken(token) {
+  async saveToken(token, signal) {
     const entry = await createEntry();
-    await entry.setPassword(token);
+    await entry.setPassword(token.trim(), signal);
   },
-  async deleteToken() {
+  async deleteToken(signal) {
     const entry = await createEntry();
-    await entry.deleteCredential();
+    await entry.deleteCredential(signal);
   },
 };

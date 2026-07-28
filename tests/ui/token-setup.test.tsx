@@ -1,12 +1,14 @@
 import assert from "node:assert/strict";
-import { describe, it } from "node:test";
+import { afterEach, describe, it } from "node:test";
 
-import { render } from "ink-testing-library";
+import { cleanup, render } from "ink-testing-library";
 import * as React from "react";
 
 import { TokenSetup } from "../../src/ui/screens/token-setup.js";
 import { createTokenStore } from "../helpers/stores.js";
-import { waitForText } from "../helpers/test-ui.js";
+import { waitFor, waitForText } from "../helpers/test-ui.js";
+
+afterEach(cleanup);
 
 describe("TokenSetup", () => {
   it("offers saved token authentication without exposing the token", async () => {
@@ -55,6 +57,10 @@ describe("TokenSetup", () => {
 
     view.stdin.write("\r");
     await waitForText(view.lastFrame, "Validating and saving token");
+    await waitFor(
+      () => state.token === token && activeToken === token,
+      "Token was not saved and activated",
+    );
 
     assert.equal(validatedToken, token);
     assert.equal(state.token, token);
@@ -66,6 +72,7 @@ describe("TokenSetup", () => {
 
   it("replaces and deletes a saved token", async () => {
     const { state, store } = createTokenStore("old-token");
+    let activeToken: string | null = "old-token";
     const replaceView = render(
       <TokenSetup
         environmentToken={null}
@@ -82,6 +89,7 @@ describe("TokenSetup", () => {
     await waitForText(replaceView.lastFrame, "*********");
     replaceView.stdin.write("\r");
     await waitForText(replaceView.lastFrame, "Validating and saving token");
+    await waitFor(() => state.token === "new-token", "Token was not replaced");
 
     assert.equal(state.token, "new-token");
     replaceView.unmount();
@@ -92,6 +100,9 @@ describe("TokenSetup", () => {
         tokenStore={store}
         validateToken={async () => {}}
         onComplete={() => {}}
+        onTokenChange={(token) => {
+          activeToken = token;
+        }}
       />,
     );
     await waitForText(deleteView.lastFrame, "Delete saved token");
@@ -100,6 +111,7 @@ describe("TokenSetup", () => {
 
     assert.equal(state.token, null);
     assert.equal(state.deleteCount, 1);
+    assert.equal(activeToken, null);
     deleteView.unmount();
   });
 
@@ -125,5 +137,45 @@ describe("TokenSetup", () => {
     assert.equal(state.token, null);
     assert.doesNotMatch(view.lastFrame() ?? "", /invalid-token/);
     view.unmount();
+  });
+
+  it("prevents duplicate validation and ignores completion after unmount", async () => {
+    const { state, store } = createTokenStore();
+    let validationCount = 0;
+    let completionCount = 0;
+    let resolveValidation: (() => void) | undefined;
+    const validation = new Promise<void>((resolve) => {
+      resolveValidation = resolve;
+    });
+    const view = render(
+      <TokenSetup
+        environmentToken={null}
+        tokenStore={store}
+        validateToken={async () => {
+          validationCount += 1;
+          await validation;
+        }}
+        onComplete={() => {
+          completionCount += 1;
+        }}
+      />,
+    );
+
+    await waitForText(view.lastFrame, "Add a GitHub token");
+    view.stdin.write("\r");
+    await waitForText(view.lastFrame, "Enter GitHub token");
+    view.stdin.write("secret-token");
+    await waitForText(view.lastFrame, "************");
+    view.stdin.write("\r");
+    view.stdin.write("\r");
+    await waitForText(view.lastFrame, "Validating and saving token");
+    assert.equal(validationCount, 1);
+
+    view.unmount();
+    resolveValidation?.();
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.equal(state.token, null);
+    assert.equal(completionCount, 0);
   });
 });

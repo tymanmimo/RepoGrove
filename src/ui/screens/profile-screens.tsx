@@ -44,10 +44,11 @@ export function SearchScreen({
 
 export function LoadingScreen({ username }: { username: string }) {
   return (
-    <Box borderStyle="round" borderColor="blue" paddingX={1}>
+    <Box borderStyle="round" borderColor="blue" flexDirection="column" paddingX={1}>
       <Text color="blueBright">
         <Spinner type="dots" /> Fetching @{username}
       </Text>
+      <Text dimColor>Esc cancel</Text>
     </Box>
   );
 }

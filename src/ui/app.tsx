@@ -24,7 +24,7 @@ import {
 } from "./screens/profile-screens.js";
 import { TokenSetup } from "./screens/token-setup.js";
 
-const { useEffect, useState } = React;
+const { useEffect, useRef, useState } = React;
 
 type Screen =
   | "authentication"
@@ -40,18 +40,20 @@ export interface AppProps {
   environmentToken?: string | null;
   tokenStore?: TokenStore;
   historyStore?: HistoryStore;
-  validateToken?: (token: string) => Promise<void>;
+  validateToken?: (token: string, signal?: AbortSignal) => Promise<void>;
   fetchStatistics?: (
     username: string,
     token: string | null,
+    signal?: AbortSignal,
   ) => Promise<ProfileStatistics>;
 }
 
 async function loadStatistics(
   username: string,
   token: string | null,
+  signal?: AbortSignal,
 ): Promise<ProfileStatistics> {
-  const data = await fetchGitHubData(username, token);
+  const data = await fetchGitHubData(username, token, signal);
   return analyzeProfile(data);
 }
 
@@ -70,17 +72,31 @@ export function App({
   const [username, setUsername] = useState("");
   const [statistics, setStatistics] = useState<ProfileStatistics | null>(null);
   const [error, setError] = useState("");
+  const mountedRef = useRef(true);
+  const requestIdRef = useRef(0);
+  const searchControllerRef = useRef<AbortController | null>(null);
+  const searchingRef = useRef(false);
+  const historyRevisionRef = useRef(0);
+
+  useEffect(() => {
+    mountedRef.current = true;
+
+    return () => {
+      mountedRef.current = false;
+      requestIdRef.current += 1;
+      searchControllerRef.current?.abort();
+    };
+  }, []);
 
   useEffect(() => {
     let mounted = true;
+    const historyRevision = historyRevisionRef.current;
 
     historyStore
       .load()
       .then((entries) => {
-        if (mounted) {
-          setHistory((currentEntries) =>
-            currentEntries.length === 0 ? entries : currentEntries,
-          );
+        if (mounted && historyRevision === historyRevisionRef.current) {
+          setHistory(entries);
         }
       })
       .catch(() => {
@@ -94,32 +110,50 @@ export function App({
     };
   }, [historyStore]);
 
-  useInput((input, key) => {
-    if (
-      input === "q" &&
-      (screen === "menu" ||
+  useInput(
+    (input, key) => {
+      if (
+        input === "q" &&
+        (screen === "menu" ||
+          screen === "history" ||
+          screen === "result" ||
+          screen === "error")
+      ) {
+        exit();
+      }
+
+      if (key.escape && (screen === "search" || screen === "history")) {
+        setScreen("menu");
+      }
+
+      if (key.escape && screen === "loading") {
+        requestIdRef.current += 1;
+        searchControllerRef.current?.abort();
+        searchingRef.current = false;
+        setScreen("search");
+      }
+
+      if (input === "r" && (screen === "result" || screen === "error")) {
+        setUsername("");
+        setStatistics(null);
+        setError("");
+        setScreen("search");
+      }
+
+      if (input === "m" && (screen === "result" || screen === "error")) {
+        setScreen("menu");
+      }
+    },
+    {
+      isActive:
+        screen === "menu" ||
         screen === "history" ||
+        screen === "search" ||
+        screen === "loading" ||
         screen === "result" ||
-        screen === "error")
-    ) {
-      exit();
-    }
-
-    if (key.escape && (screen === "search" || screen === "history")) {
-      setScreen("menu");
-    }
-
-    if (input === "r" && (screen === "result" || screen === "error")) {
-      setUsername("");
-      setStatistics(null);
-      setError("");
-      setScreen("search");
-    }
-
-    if (input === "m" && (screen === "result" || screen === "error")) {
-      setScreen("menu");
-    }
-  });
+        screen === "error",
+    },
+  );
 
   const selectMainMenu = (action: MainMenuAction) => {
     if (action === "exit") {
@@ -144,28 +178,62 @@ export function App({
   const search = async (value: string) => {
     const normalizedUsername = value.trim();
 
-    if (!normalizedUsername) {
+    if (!normalizedUsername || searchingRef.current) {
       return;
     }
 
+    searchingRef.current = true;
+    const requestId = ++requestIdRef.current;
+    const controller = new AbortController();
+    searchControllerRef.current = controller;
     setUsername(normalizedUsername);
     setScreen("loading");
 
     try {
-      const result = await fetchStatistics(normalizedUsername, activeToken);
+      const result = await fetchStatistics(
+        normalizedUsername,
+        activeToken,
+        controller.signal,
+      );
+
+      if (
+        !mountedRef.current ||
+        requestId !== requestIdRef.current ||
+        controller.signal.aborted
+      ) {
+        return;
+      }
+
       setStatistics(result);
       setScreen("result");
 
       try {
+        historyRevisionRef.current += 1;
         const updatedHistory = await historyStore.add(result.username);
-        setHistory(updatedHistory);
-        setHistoryError("");
+
+        if (mountedRef.current && requestId === requestIdRef.current) {
+          setHistory(updatedHistory);
+          setHistoryError("");
+        }
       } catch {
-        setHistoryError("Could not save search history.");
+        if (mountedRef.current && requestId === requestIdRef.current) {
+          setHistoryError("Could not save search history.");
+        }
       }
     } catch (searchError) {
-      setError(formatError(searchError));
-      setScreen("error");
+      if (
+        mountedRef.current &&
+        requestId === requestIdRef.current &&
+        !controller.signal.aborted
+      ) {
+        setError(formatError(searchError));
+        setScreen("error");
+      }
+    } finally {
+      if (requestId === requestIdRef.current) {
+        searchingRef.current = false;
+        searchControllerRef.current = null;
+      }
     }
   };
 
@@ -181,6 +249,7 @@ export function App({
     }
 
     try {
+      historyRevisionRef.current += 1;
       await historyStore.clear();
       setHistory([]);
       setHistoryError("");
@@ -199,6 +268,7 @@ export function App({
     tokenStore,
     validateToken,
     onComplete: completeTokenSetup,
+    onTokenChange: setActiveToken,
   };
 
   return (

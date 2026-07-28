@@ -1,8 +1,16 @@
 import { mkdir, readFile, rename, rm, writeFile } from "node:fs/promises";
+import { randomUUID } from "node:crypto";
 import { homedir } from "node:os";
 import { dirname, join } from "node:path";
 
 const historyLimit = 10;
+
+export class HistoryDataError extends Error {
+  constructor() {
+    super("Search history is corrupted.");
+    this.name = "HistoryDataError";
+  }
+}
 
 export interface SearchHistoryEntry {
   username: string;
@@ -35,7 +43,7 @@ function getDataDirectory(): string {
 
 function parseHistory(value: unknown): SearchHistoryEntry[] {
   if (!Array.isArray(value)) {
-    return [];
+    throw new HistoryDataError();
   }
 
   return value
@@ -44,8 +52,14 @@ function parseHistory(value: unknown): SearchHistoryEntry[] {
         typeof entry === "object" &&
         entry !== null &&
         typeof (entry as SearchHistoryEntry).username === "string" &&
-        typeof (entry as SearchHistoryEntry).searchedAt === "string",
+        (entry as SearchHistoryEntry).username.trim().length > 0 &&
+        typeof (entry as SearchHistoryEntry).searchedAt === "string" &&
+        Number.isFinite(Date.parse((entry as SearchHistoryEntry).searchedAt)),
     )
+    .map((entry) => ({
+      username: entry.username.trim(),
+      searchedAt: entry.searchedAt,
+    }))
     .slice(0, historyLimit);
 }
 
@@ -53,16 +67,19 @@ export function createHistoryStore(
   filePath = join(getDataDirectory(), "history.json"),
   now: () => Date = () => new Date(),
 ): HistoryStore {
-  const load = async () => {
+  let mutationQueue: Promise<void> = Promise.resolve();
+
+  const loadFile = async () => {
     try {
       const content = await readFile(filePath, "utf8");
       return parseHistory(JSON.parse(content));
     } catch (error) {
-      if (
-        error instanceof SyntaxError ||
-        (error instanceof Error && "code" in error && error.code === "ENOENT")
-      ) {
+      if (error instanceof Error && "code" in error && error.code === "ENOENT") {
         return [];
+      }
+
+      if (error instanceof SyntaxError) {
+        throw new HistoryDataError();
       }
 
       throw error;
@@ -71,7 +88,7 @@ export function createHistoryStore(
 
   const write = async (entries: SearchHistoryEntry[]) => {
     const directory = dirname(filePath);
-    const temporaryPath = `${filePath}.${process.pid}.tmp`;
+    const temporaryPath = `${filePath}.${process.pid}.${randomUUID()}.tmp`;
     await mkdir(directory, { recursive: true, mode: 0o700 });
 
     try {
@@ -80,31 +97,55 @@ export function createHistoryStore(
         mode: 0o600,
       });
       await rename(temporaryPath, filePath);
-    } finally {
-      await rm(temporaryPath, { force: true });
+    } catch (error) {
+      await rm(temporaryPath, { force: true }).catch(() => {});
+      throw error;
     }
+
+    await rm(temporaryPath, { force: true }).catch(() => {});
+  };
+
+  const mutate = <T>(operation: () => Promise<T>): Promise<T> => {
+    const result = mutationQueue.then(operation, operation);
+    mutationQueue = result.then(
+      () => undefined,
+      () => undefined,
+    );
+    return result;
   };
 
   return {
-    load,
-    async add(username) {
-      const normalizedUsername = username.trim();
-      const entries = await load();
-      const updatedEntries = [
-        {
-          username: normalizedUsername,
-          searchedAt: now().toISOString(),
-        },
-        ...entries.filter(
-          (entry) =>
-            entry.username.toLowerCase() !== normalizedUsername.toLowerCase(),
-        ),
-      ].slice(0, historyLimit);
-      await write(updatedEntries);
-      return updatedEntries;
+    async load() {
+      await mutationQueue;
+      return loadFile();
     },
-    async clear() {
-      await rm(filePath, { force: true });
+    add(username) {
+      return mutate(async () => {
+        const normalizedUsername = username.trim();
+
+        if (!normalizedUsername) {
+          throw new HistoryDataError();
+        }
+
+        const entries = await loadFile();
+        const updatedEntries = [
+          {
+            username: normalizedUsername,
+            searchedAt: now().toISOString(),
+          },
+          ...entries.filter(
+            (entry) =>
+              entry.username.toLowerCase() !== normalizedUsername.toLowerCase(),
+          ),
+        ].slice(0, historyLimit);
+        await write(updatedEntries);
+        return updatedEntries;
+      });
+    },
+    clear() {
+      return mutate(async () => {
+        await rm(filePath, { force: true });
+      });
     },
   };
 }

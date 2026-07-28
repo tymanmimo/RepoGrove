@@ -10,7 +10,7 @@ export function renderApp(props: AppProps = {}) {
   return render(
     <App
       {...props}
-      environmentToken={null}
+      environmentToken={props.environmentToken ?? null}
       tokenStore={tokenStore}
       historyStore={historyStore}
     />,
@@ -21,8 +21,18 @@ export async function waitForText(
   lastFrame: () => string | undefined,
   expectedText: string,
 ) {
+  await waitFor(
+    () => Boolean(lastFrame()?.includes(expectedText)),
+    `Expected frame to include: ${expectedText}`,
+  );
+}
+
+export async function waitFor(
+  condition: () => boolean,
+  failureMessage: string,
+) {
   for (let attempt = 0; attempt < 50; attempt += 1) {
-    if (lastFrame()?.includes(expectedText)) {
+    if (condition()) {
       await new Promise((resolve) => setTimeout(resolve, 20));
       return;
     }
@@ -30,7 +40,7 @@ export async function waitForText(
     await new Promise((resolve) => setTimeout(resolve, 10));
   }
 
-  throw new Error(`Expected frame to include: ${expectedText}`);
+  throw new Error(failureMessage);
 }
 
 export async function typeText(
