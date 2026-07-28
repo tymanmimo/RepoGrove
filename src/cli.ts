@@ -2,6 +2,7 @@
 
 import { RequestError } from "octokit";
 
+import { analyzeGitHubData } from "./analyzer.js";
 import { fetchGitHubData } from "./github.js";
 
 function formatError(error: unknown): string {
@@ -31,8 +32,26 @@ if (!username) {
   process.exitCode = 1;
 } else {
   try {
-    const { profile, repositories } = await fetchGitHubData(username);
-    console.log(`Loaded @${profile.login}: ${repositories.length} public repositories.`);
+    const data = await fetchGitHubData(username);
+    const statistics = analyzeGitHubData(data);
+
+    console.log(`GitHub profile: @${statistics.username}`);
+    console.log(`Public repositories: ${statistics.repositoryCount}`);
+    console.log(`Total stars: ${statistics.starCount}`);
+
+    if (statistics.languages.length === 0) {
+      console.log("Languages: No language data available.");
+    } else {
+      console.log("Languages:");
+
+      for (const language of statistics.languages) {
+        const repositoryLabel =
+          language.repositoryCount === 1 ? "repository" : "repositories";
+        console.log(
+          `  ${language.name}: ${language.repositoryCount} ${repositoryLabel} (${language.percentage}%)`,
+        );
+      }
+    }
   } catch (error) {
     console.error(formatError(error));
     process.exitCode = 1;
