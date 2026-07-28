@@ -10,13 +10,14 @@ import { formatError } from "./errors.js";
 const { useEffect, useState } = React;
 
 type TokenScreen = "loading" | "choice" | "input" | "validating";
-type TokenChoice = "use" | "replace" | "delete" | "anonymous";
+type TokenChoice = "use" | "replace" | "delete" | "anonymous" | "back";
 
 export interface TokenSetupProps {
   environmentToken: string | null;
   tokenStore: TokenStore;
   validateToken: (token: string) => Promise<string>;
   onComplete: (token: string | null) => void;
+  onCancel?: () => void;
 }
 
 export function TokenSetup({
@@ -24,6 +25,7 @@ export function TokenSetup({
   tokenStore,
   validateToken,
   onComplete,
+  onCancel,
 }: TokenSetupProps) {
   const [screen, setScreen] = useState<TokenScreen>("loading");
   const [savedToken, setSavedToken] = useState<string | null>(null);
@@ -60,11 +62,15 @@ export function TokenSetup({
       setTokenError("");
       setScreen("choice");
     }
+
+    if (screen === "choice" && key.escape) {
+      onCancel?.();
+    }
   });
 
   const availableToken = savedToken ?? environmentToken;
   const tokenSource = savedToken ? "saved" : environmentToken ? "environment" : null;
-  const items: Array<{ label: string; value: TokenChoice }> = tokenSource
+  const tokenItems: Array<{ label: string; value: TokenChoice }> = tokenSource
     ? [
         {
           label: `Use ${tokenSource} token`,
@@ -97,8 +103,24 @@ export function TokenSetup({
           value: "anonymous",
         },
       ];
+  const items = [
+    ...tokenItems,
+    ...(onCancel
+      ? [
+          {
+            label: "Back to main menu",
+            value: "back" as const,
+          },
+        ]
+      : []),
+  ];
 
   const selectMode = async (choice: TokenChoice) => {
+    if (choice === "back") {
+      onCancel?.();
+      return;
+    }
+
     if (choice === "use") {
       onComplete(availableToken);
       return;

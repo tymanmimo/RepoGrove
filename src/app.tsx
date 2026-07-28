@@ -7,15 +7,30 @@ import { analyzeGitHubData, type ProfileStatistics } from "./analyzer.js";
 import { systemTokenStore, type TokenStore } from "./credentials.js";
 import { formatError } from "./errors.js";
 import { fetchGitHubData, validateGitHubToken } from "./github.js";
+import {
+  localHistoryStore,
+  type HistoryStore,
+  type SearchHistoryEntry,
+} from "./history.js";
+import { HistoryMenu, MainMenu, type MainMenuAction } from "./menu.js";
 import { TokenSetup } from "./token-setup.js";
 
-const { useState } = React;
+const { useEffect, useState } = React;
 
-type Screen = "authentication" | "search" | "loading" | "result" | "error";
+type Screen =
+  | "authentication"
+  | "menu"
+  | "token-settings"
+  | "history"
+  | "search"
+  | "loading"
+  | "result"
+  | "error";
 
 export interface AppProps {
   environmentToken?: string | null;
   tokenStore?: TokenStore;
+  historyStore?: HistoryStore;
   validateToken?: (token: string) => Promise<string>;
   fetchStatistics?: (
     username: string,
@@ -73,7 +88,7 @@ function SearchScreen({
         />
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>Enter analyze  Ctrl+C quit</Text>
+        <Text dimColor>Enter analyze  Esc menu  Ctrl+C quit</Text>
       </Box>
     </Box>
   );
@@ -159,7 +174,7 @@ function Dashboard({ statistics }: { statistics: ProfileStatistics }) {
       </Box>
 
       <Box marginTop={1}>
-        <Text dimColor>[r] New search  [q] Quit</Text>
+        <Text dimColor>[r] New search  [m] Main menu  [q] Quit</Text>
       </Box>
     </Box>
   );
@@ -175,7 +190,7 @@ function ErrorScreen({ message }: { message: string }) {
         <Text>{message}</Text>
       </Box>
       <Box marginTop={1}>
-        <Text dimColor>[r] Try again  [q] Quit</Text>
+        <Text dimColor>[r] Try again  [m] Main menu  [q] Quit</Text>
       </Box>
     </Box>
   );
@@ -184,32 +199,88 @@ function ErrorScreen({ message }: { message: string }) {
 export function App({
   environmentToken = process.env.GITHUB_TOKEN?.trim() || null,
   tokenStore = systemTokenStore,
+  historyStore = localHistoryStore,
   validateToken = validateGitHubToken,
   fetchStatistics = loadStatistics,
 }: AppProps) {
   const { exit } = useApp();
   const [screen, setScreen] = useState<Screen>("authentication");
   const [activeToken, setActiveToken] = useState<string | null>(null);
+  const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
+  const [historyError, setHistoryError] = useState("");
   const [username, setUsername] = useState("");
   const [statistics, setStatistics] = useState<ProfileStatistics | null>(null);
   const [error, setError] = useState("");
 
-  useInput((input) => {
-    if (screen !== "result" && screen !== "error") {
-      return;
-    }
+  useEffect(() => {
+    let mounted = true;
 
-    if (input === "q") {
+    historyStore
+      .load()
+      .then((entries) => {
+        if (mounted) {
+          setHistory((currentEntries) =>
+            currentEntries.length === 0 ? entries : currentEntries,
+          );
+        }
+      })
+      .catch(() => {
+        if (mounted) {
+          setHistoryError("Search history is unavailable.");
+        }
+      });
+
+    return () => {
+      mounted = false;
+    };
+  }, [historyStore]);
+
+  useInput((input, key) => {
+    if (
+      input === "q" &&
+      (screen === "menu" ||
+        screen === "history" ||
+        screen === "result" ||
+        screen === "error")
+    ) {
       exit();
     }
 
-    if (input === "r") {
+    if (key.escape && (screen === "search" || screen === "history")) {
+      setScreen("menu");
+    }
+
+    if (input === "r" && (screen === "result" || screen === "error")) {
       setUsername("");
       setStatistics(null);
       setError("");
       setScreen("search");
     }
+
+    if (input === "m" && (screen === "result" || screen === "error")) {
+      setScreen("menu");
+    }
   });
+
+  const selectMainMenu = (action: MainMenuAction) => {
+    if (action === "exit") {
+      exit();
+      return;
+    }
+
+    if (action === "search") {
+      setUsername("");
+      setScreen("search");
+      return;
+    }
+
+    if (action === "history") {
+      setScreen("history");
+      return;
+    }
+
+    setScreen("token-settings");
+  };
 
   const search = async (value: string) => {
     const normalizedUsername = value.trim();
@@ -225,9 +296,42 @@ export function App({
       const result = await fetchStatistics(normalizedUsername, activeToken);
       setStatistics(result);
       setScreen("result");
+
+      try {
+        const updatedHistory = await historyStore.add(result.username);
+        setHistory(updatedHistory);
+        setHistoryError("");
+      } catch {
+        setHistoryError("Could not save search history.");
+      }
     } catch (searchError) {
       setError(formatError(searchError));
       setScreen("error");
+    }
+  };
+
+  const selectHistory = async (
+    action:
+      | { type: "search"; username: string }
+      | { type: "clear" }
+      | { type: "back" },
+  ) => {
+    if (action.type === "search") {
+      await search(action.username);
+      return;
+    }
+
+    if (action.type === "back") {
+      setScreen("menu");
+      return;
+    }
+
+    try {
+      await historyStore.clear();
+      setHistory([]);
+      setHistoryError("");
+    } catch {
+      setHistoryError("Could not clear search history.");
     }
   };
 
@@ -241,9 +345,32 @@ export function App({
           validateToken={validateToken}
           onComplete={(token) => {
             setActiveToken(token);
-            setScreen("search");
+            setScreen("menu");
           }}
         />
+      )}
+      {screen === "menu" && (
+        <MainMenu
+          authenticated={Boolean(activeToken)}
+          historyCount={history.length}
+          historyError={historyError}
+          onSelect={selectMainMenu}
+        />
+      )}
+      {screen === "token-settings" && (
+        <TokenSetup
+          environmentToken={environmentToken}
+          tokenStore={tokenStore}
+          validateToken={validateToken}
+          onComplete={(token) => {
+            setActiveToken(token);
+            setScreen("menu");
+          }}
+          onCancel={() => setScreen("menu")}
+        />
+      )}
+      {screen === "history" && (
+        <HistoryMenu entries={history} error={historyError} onSelect={selectHistory} />
       )}
       {screen === "search" && (
         <SearchScreen
