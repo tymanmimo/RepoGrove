@@ -28,9 +28,11 @@ async function openTokenSettings(view: ReturnType<typeof renderApp>) {
 
 describe("App", () => {
   it("moves from welcome to an anonymous workspace", async () => {
-    const view = renderApp();
+    const view = renderApp({ terminalSize: { columns: 100, rows: 40 } });
 
     await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
+    assert.match(view.lastFrame() ?? "", /REPOGROVE/);
+    assert.match(view.lastFrame() ?? "", /████████████/);
     view.stdin.write("j");
     await waitForText(view.lastFrame, "Continue without a token");
     view.stdin.write("\r");

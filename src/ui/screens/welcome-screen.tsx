@@ -13,7 +13,7 @@ export function WelcomeScreen({
   size: TerminalSize;
   children: ReactNode;
 }) {
-  const compact = size.columns < 50 || size.rows < 18;
+  const compact = size.columns < 50 || size.rows < 24;
   const panelWidth = Math.min(Math.max(size.columns - 4, 28), 72);
 
   return (
@@ -25,7 +25,7 @@ export function WelcomeScreen({
       flexDirection="column"
     >
       <Box width={panelWidth} flexDirection="column">
-        <Header compact={compact} />
+        <Header compact={compact} showLogo />
         <Text color={theme.muted}>Connect securely or continue with public API access.</Text>
         <Box marginTop={compact ? 0 : 1}>{children}</Box>
       </Box>

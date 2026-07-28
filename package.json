@@ -1,10 +1,10 @@
 {
-  "name": "github-analyzer",
+  "name": "repogrove",
   "version": "0.1.0",
-  "description": "A CLI tool for analyzing public GitHub profiles",
+  "description": "Explore public GitHub profiles in your terminal",
   "type": "module",
   "bin": {
-    "github-analyzer": "./dist/cli.js"
+    "repogrove": "./dist/cli.js"
   },
   "scripts": {
     "build": "npm run clean && tsc",

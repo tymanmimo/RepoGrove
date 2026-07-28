@@ -13,7 +13,7 @@ const enterAlternateScreen = "\u001B[?1049h";
 const leaveAlternateScreen = "\u001B[?1049l";
 
 const program = new Command()
-  .name("github-analyzer")
+  .name("repogrove")
   .description("Explore public GitHub profiles in an interactive terminal UI")
   .version(version)
   .allowExcessArguments(false)

@@ -9,7 +9,7 @@ import { createHistoryStore } from "../../src/storage/history-store.js";
 const temporaryDirectories: string[] = [];
 
 async function createTemporaryDirectory() {
-  const directory = await mkdtemp(join(tmpdir(), "github-analyzer-"));
+  const directory = await mkdtemp(join(tmpdir(), "repogrove-"));
   temporaryDirectories.push(directory);
   return directory;
 }
