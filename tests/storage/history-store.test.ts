@@ -4,7 +4,7 @@ import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, it } from "node:test";
 
-import { createHistoryStore } from "../src/history.js";
+import { createHistoryStore } from "../../src/storage/history-store.js";
 
 const temporaryDirectories: string[] = [];
 

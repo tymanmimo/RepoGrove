@@ -7,12 +7,13 @@
     "github-analyzer": "./dist/cli.js"
   },
   "scripts": {
-    "build": "tsc",
+    "build": "npm run clean && tsc",
     "check": "npm run lint && npm run typecheck && npm test && npm run build",
+    "clean": "node -e \"require('node:fs').rmSync('dist', { recursive: true, force: true })\"",
     "dev": "tsx src/cli.ts",
     "lint": "eslint .",
     "start": "node dist/cli.js",
-    "test": "tsx --test tests/analyzer.test.ts tests/app.test.tsx tests/history.test.ts",
+    "test": "tsx --test tests/core/profile-analyzer.test.ts tests/storage/history-store.test.ts tests/ui/app.test.tsx tests/ui/token-setup.test.tsx",
     "typecheck": "tsc --noEmit && tsc -p tests/tsconfig.json"
   },
   "engines": {

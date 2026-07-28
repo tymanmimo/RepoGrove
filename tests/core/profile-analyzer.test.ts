@@ -1,10 +1,10 @@
 import assert from "node:assert/strict";
 import { describe, it } from "node:test";
 
-import { analyzeGitHubData } from "../src/analyzer.js";
-import type { GitHubData } from "../src/github.js";
+import { analyzeProfile } from "../../src/core/profile-analyzer.js";
 
-type Repository = GitHubData["repositories"][number];
+type AnalysisInput = Parameters<typeof analyzeProfile>[0];
+type Repository = AnalysisInput["repositories"][number];
 
 function createRepository(
   name: string,
@@ -22,22 +22,22 @@ function createRepository(
   } as Repository;
 }
 
-function createGitHubData(
+function createAnalysisInput(
   repositories: Repository[],
   publicRepos = repositories.length,
-): GitHubData {
+): AnalysisInput {
   return {
     profile: {
       login: "test-user",
       public_repos: publicRepos,
-    } as GitHubData["profile"],
+    },
     repositories,
   };
 }
 
-describe("analyzeGitHubData", () => {
+describe("analyzeProfile", () => {
   it("calculates repository, star, and language statistics", () => {
-    const data = createGitHubData([
+    const data = createAnalysisInput([
       createRepository("typescript-one", {
         language: "TypeScript",
         stargazers_count: 5,
@@ -55,7 +55,7 @@ describe("analyzeGitHubData", () => {
       }),
     ]);
 
-    const statistics = analyzeGitHubData(data);
+    const statistics = analyzeProfile(data);
 
     assert.equal(statistics.username, "test-user");
     assert.equal(statistics.repositoryCount, 4);
@@ -75,7 +75,7 @@ describe("analyzeGitHubData", () => {
   });
 
   it("filters, sorts, and limits active projects", () => {
-    const data = createGitHubData([
+    const data = createAnalysisInput([
       createRepository("sixth", {
         updated_at: "2026-01-01T00:00:00Z",
       }),
@@ -104,7 +104,7 @@ describe("analyzeGitHubData", () => {
       }),
     ]);
 
-    const statistics = analyzeGitHubData(data);
+    const statistics = analyzeProfile(data);
 
     assert.deepEqual(
       statistics.activeProjects.map((project) => project.name),
@@ -113,14 +113,14 @@ describe("analyzeGitHubData", () => {
   });
 
   it("handles empty data and missing optional fields", () => {
-    const emptyStatistics = analyzeGitHubData(createGitHubData([]));
-    const repository = {
+    const emptyStatistics = analyzeProfile(createAnalysisInput([]));
+    const repository: Repository = {
       name: "minimal",
       fork: false,
       archived: false,
       html_url: "https://github.com/test-user/minimal",
-    } as Repository;
-    const minimalStatistics = analyzeGitHubData(createGitHubData([repository]));
+    };
+    const minimalStatistics = analyzeProfile(createAnalysisInput([repository]));
 
     assert.equal(emptyStatistics.starCount, 0);
     assert.deepEqual(emptyStatistics.languages, []);

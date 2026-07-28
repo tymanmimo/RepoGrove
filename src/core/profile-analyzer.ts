@@ -1,12 +1,10 @@
-import type { GitHubData } from "./github.js";
-
-export interface LanguageStatistics {
+interface LanguageStatistics {
   name: string;
   repositoryCount: number;
   percentage: number;
 }
 
-export interface ActiveProject {
+interface ActiveProject {
   name: string;
   language: string | null;
   starCount: number;
@@ -22,10 +20,26 @@ export interface ProfileStatistics {
   activeProjects: ActiveProject[];
 }
 
-export function analyzeGitHubData({
+interface ProfileAnalysisInput {
+  profile: {
+    login: string;
+    public_repos: number;
+  };
+  repositories: ReadonlyArray<{
+    name: string;
+    language?: string | null;
+    stargazers_count?: number;
+    fork: boolean;
+    archived?: boolean;
+    html_url: string;
+    updated_at?: string | null;
+  }>;
+}
+
+export function analyzeProfile({
   profile,
   repositories,
-}: GitHubData): ProfileStatistics {
+}: ProfileAnalysisInput): ProfileStatistics {
   const languageCounts = new Map<string, number>();
   let starCount = 0;
 

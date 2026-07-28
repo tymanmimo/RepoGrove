@@ -4,18 +4,18 @@ import SelectInput from "ink-select-input";
 import Spinner from "ink-spinner";
 import TextInput from "ink-text-input";
 
-import type { TokenStore } from "./credentials.js";
-import { formatError } from "./errors.js";
+import { formatError } from "../../github/errors.js";
+import type { TokenStore } from "../../storage/token-store.js";
 
 const { useEffect, useState } = React;
 
 type TokenScreen = "loading" | "choice" | "input" | "validating";
 type TokenChoice = "use" | "replace" | "delete" | "anonymous" | "back";
 
-export interface TokenSetupProps {
+interface TokenSetupProps {
   environmentToken: string | null;
   tokenStore: TokenStore;
-  validateToken: (token: string) => Promise<string>;
+  validateToken: (token: string) => Promise<void>;
   onComplete: (token: string | null) => void;
   onCancel?: () => void;
 }

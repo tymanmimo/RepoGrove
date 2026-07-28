@@ -5,10 +5,9 @@ function createGitHubClient(token?: string | null) {
   return new Octokit(normalizedToken ? { auth: normalizedToken } : {});
 }
 
-export async function validateGitHubToken(token: string): Promise<string> {
+export async function validateGitHubToken(token: string): Promise<void> {
   const octokit = createGitHubClient(token);
-  const response = await octokit.rest.users.getAuthenticated();
-  return response.data.login;
+  await octokit.rest.users.getAuthenticated();
 }
 
 export async function fetchGitHubData(username: string, token?: string | null) {
@@ -29,5 +28,3 @@ export async function fetchGitHubData(username: string, token?: string | null) {
     repositories,
   };
 }
-
-export type GitHubData = Awaited<ReturnType<typeof fetchGitHubData>>;
