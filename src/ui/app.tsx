@@ -96,7 +96,7 @@ export function App({
         }
       })
       .catch(() => {
-        if (mounted) {
+        if (mounted && historyRevision === historyRevisionRef.current) {
           setHistoryError("Search history is unavailable.");
         }
       });
@@ -173,6 +173,8 @@ export function App({
 
       setStatistics(result);
       setStatus("result");
+      searchingRef.current = false;
+      searchControllerRef.current = null;
 
       try {
         historyRevisionRef.current += 1;

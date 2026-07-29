@@ -10,6 +10,7 @@ import {
   openSearch,
   renderApp,
   typeText,
+  waitFor,
   waitForText,
 } from "../helpers/test-ui.js";
 
@@ -324,6 +325,79 @@ describe("App", () => {
     await new Promise((resolve) => setTimeout(resolve, 50));
 
     assert.doesNotMatch(view.lastFrame() ?? "", /stale-user/);
+  });
+
+  it("allows searches while history persistence is pending", async () => {
+    const { store: tokenStore } = createTokenStore("saved-token");
+    const searches: string[] = [];
+    const historyStore: HistoryStore = {
+      async load() {
+        return [
+          {
+            username: "second-user",
+            searchedAt: "2026-07-20T12:00:00.000Z",
+          },
+        ];
+      },
+      async add() {
+        return new Promise(() => {});
+      },
+      async clear() {},
+    };
+    const view = renderApp({
+      initialUsername: "first-user",
+      tokenStore,
+      historyStore,
+      async fetchStatistics(username) {
+        searches.push(username);
+        return { ...profileStatistics, username };
+      },
+    });
+
+    await waitForText(view.lastFrame, "Use saved token");
+    view.stdin.write("\r");
+    await waitForText(view.lastFrame, "Active Projects");
+    await waitForText(view.lastFrame, "second-user");
+    view.stdin.write("\t");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    view.stdin.write("\r");
+    await waitFor(
+      () => searches.length === 2,
+      "Expected a second search while history persistence was pending",
+    );
+
+    assert.deepEqual(searches, ["first-user", "second-user"]);
+  });
+
+  it("ignores a stale startup history failure", async () => {
+    const { store: tokenStore } = createTokenStore("saved-token");
+    let rejectLoad: ((reason: Error) => void) | undefined;
+    const startupHistory = new Promise<never[]>((_resolve, reject) => {
+      rejectLoad = reject;
+    });
+    const historyStore: HistoryStore = {
+      async load() {
+        return startupHistory;
+      },
+      async add(username) {
+        return [{ username, searchedAt: "2026-07-28T12:00:00.000Z" }];
+      },
+      async clear() {},
+    };
+    const view = renderApp({
+      tokenStore,
+      historyStore,
+      fetchStatistics: async () => profileStatistics,
+    });
+
+    await useSavedToken(view);
+    await typeText(view, "octocat");
+    view.stdin.write("\r");
+    await waitForText(view.lastFrame, "Active Projects");
+    rejectLoad?.(new Error("History unavailable"));
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.doesNotMatch(view.lastFrame() ?? "", /Search history is unavailable/);
   });
 
   it("adapts result details to compact and wide terminals", async () => {
