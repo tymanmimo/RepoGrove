@@ -1,13 +1,6 @@
 # RepoGrove
 
-```text
-       ██
-    ██ ██ ██
-  ████████████
-     ██████
-       ██
-    REPOGROVE
-```
+![RepoGrove pixel terminal logo](assets/repogrove-logo.svg)
 
 **Explore public GitHub profiles without leaving your terminal.**
 

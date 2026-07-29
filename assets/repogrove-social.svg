@@ -1,0 +1,41 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="1280" height="640" viewBox="0 0 1280 640" role="img" aria-labelledby="title description">
+  <title id="title">RepoGrove</title>
+  <desc id="description">A pixel commit tree and RepoGrove wordmark in a forest themed terminal.</desc>
+  <rect width="1280" height="640" fill="#071009"/>
+  <rect x="32" y="32" width="12" height="12" fill="#344B38"/>
+  <rect x="1236" y="32" width="12" height="12" fill="#344B38"/>
+  <rect x="32" y="596" width="12" height="12" fill="#344B38"/>
+  <rect x="1236" y="596" width="12" height="12" fill="#344B38"/>
+
+  <rect x="80" y="60" width="1120" height="520" rx="20" fill="#0B120D" stroke="#46664C" stroke-width="3"/>
+  <path d="M80 124H1200" stroke="#344B38" stroke-width="3"/>
+  <rect x="112" y="88" width="14" height="14" fill="#D58A83"/>
+  <rect x="138" y="88" width="14" height="14" fill="#C8B878"/>
+  <rect x="164" y="88" width="14" height="14" fill="#8FB996"/>
+  <text x="640" y="102" fill="#718475" font-family="Consolas, 'Courier New', monospace" font-size="18" text-anchor="middle">~/repogrove</text>
+
+  <g transform="translate(150 190) scale(1.45)">
+    <path d="M108 24V48M60 60H156M60 60V84M108 60V120M156 60V84M72 108H144M72 108V144M144 108V144M108 144V168M72 168H144" fill="none" stroke="#46664C" stroke-width="10"/>
+    <rect x="96" width="24" height="24" fill="#B7D3B2"/>
+    <rect x="48" y="48" width="24" height="24" fill="#8FB996"/>
+    <rect x="96" y="48" width="24" height="24" fill="#B7D3B2"/>
+    <rect x="144" y="48" width="24" height="24" fill="#8FB996"/>
+    <rect x="24" y="84" width="168" height="24" fill="#6F9B72"/>
+    <rect x="48" y="108" width="120" height="24" fill="#8FB996"/>
+    <rect x="96" y="132" width="24" height="36" fill="#6F9B72"/>
+    <rect x="60" y="168" width="24" height="18" fill="#46664C"/>
+    <rect x="96" y="168" width="24" height="18" fill="#6F9B72"/>
+    <rect x="132" y="168" width="24" height="18" fill="#46664C"/>
+  </g>
+
+  <text x="510" y="276" fill="#B7D3B2" font-family="Consolas, 'Courier New', monospace" font-size="76" font-weight="700" letter-spacing="9">REPOGROVE</text>
+  <text x="516" y="326" fill="#8FB996" font-family="Consolas, 'Courier New', monospace" font-size="23">Explore public GitHub profiles</text>
+  <text x="516" y="360" fill="#718475" font-family="Consolas, 'Courier New', monospace" font-size="23">without leaving your terminal.</text>
+
+  <rect x="510" y="410" width="550" height="68" rx="6" fill="#101A12" stroke="#344B38" stroke-width="2"/>
+  <text x="540" y="453" fill="#6F9B72" font-family="Consolas, 'Courier New', monospace" font-size="25">$</text>
+  <text x="574" y="453" fill="#B7D3B2" font-family="Consolas, 'Courier New', monospace" font-size="25">repogrove tymanmimo</text>
+  <rect x="892" y="427" width="13" height="31" fill="#8FB996"/>
+
+  <text x="112" y="548" fill="#46664C" font-family="Consolas, 'Courier New', monospace" font-size="16">TYPESCRIPT · REACT · INK · GITHUB API</text>
+</svg>
