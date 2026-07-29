@@ -1,6 +1,7 @@
 {
   "name": "repogrove",
   "version": "0.1.0",
+  "private": true,
   "description": "Explore public GitHub profiles in your terminal",
   "type": "module",
   "bin": {

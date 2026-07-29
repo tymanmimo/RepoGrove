@@ -55,6 +55,7 @@ npm start -- tymanmimo
 To expose the `repogrove` command from a local checkout:
 
 ```bash
+npm run build
 npm link
 repogrove
 repogrove tymanmimo
@@ -78,6 +79,9 @@ On startup, RepoGrove lets you:
 - use the current `GITHUB_TOKEN` environment variable;
 - enter, validate, and securely save a new token;
 - continue without a token.
+
+Saved credentials take precedence when both a saved token and `GITHUB_TOKEN`
+are available.
 
 Use a least-privilege token intended for public data. Tokens entered in the
 application are masked, validated against GitHub, and stored through
