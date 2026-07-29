@@ -16,9 +16,10 @@ const program = new Command()
   .name("repogrove")
   .description("Explore public GitHub profiles in an interactive terminal UI")
   .version(version)
+  .argument("[username]", "GitHub username to open")
   .allowExcessArguments(false)
   .showHelpAfterError()
-  .action(async () => {
+  .action(async (username = "") => {
     if (!process.stdin.isTTY || !process.stdout.isTTY) {
       console.error("Interactive mode requires a terminal.");
       process.exitCode = 1;
@@ -28,7 +29,7 @@ const program = new Command()
     process.stdout.write(enterAlternateScreen);
 
     try {
-      const app = render(createElement(App));
+      const app = render(createElement(App, { initialUsername: username }));
       await app.waitUntilExit();
     } finally {
       process.stdout.write(leaveAlternateScreen);

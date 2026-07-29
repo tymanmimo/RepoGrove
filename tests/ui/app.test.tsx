@@ -44,6 +44,37 @@ describe("App", () => {
     assert.match(frame, /Search for a GitHub account to begin/);
   });
 
+  it("automatically searches an initial username once", async () => {
+    const { store } = createTokenStore("saved-token");
+    const history = createHistoryStore();
+    const searches: Array<{ username: string; token: string | null }> = [];
+    const view = renderApp({
+      initialUsername: "  tymanmimo  ",
+      tokenStore: store,
+      historyStore: history.store,
+      async fetchStatistics(username, token) {
+        searches.push({ username, token });
+        return { ...profileStatistics, username };
+      },
+    });
+
+    await waitForText(view.lastFrame, "Use saved token");
+    view.stdin.write("\r");
+    await waitForText(view.lastFrame, "Active Projects");
+
+    assert.deepEqual(searches, [
+      { username: "tymanmimo", token: "saved-token" },
+    ]);
+    assert.equal(history.state.entries[0]?.username, "tymanmimo");
+
+    await openTokenSettings(view);
+    view.stdin.write("\u001B");
+    await waitForText(view.lastFrame, "Search Account");
+    await new Promise((resolve) => setTimeout(resolve, 50));
+
+    assert.equal(searches.length, 1);
+  });
+
   it("searches with a saved token and updates the sidebar", async () => {
     const { store } = createTokenStore("saved-token");
     const history = createHistoryStore();

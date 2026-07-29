@@ -22,6 +22,7 @@ responsive workspace.
 ## Features
 
 - Search any public GitHub account from an interactive terminal workspace.
+- Open a profile directly with an optional username argument.
 - Review repository totals, accumulated stars, and primary-language distribution.
 - Discover recently updated projects while filtering out forks and archived repositories.
 - Repeat or clear up to ten recent searches from the history sidebar.
@@ -54,6 +55,7 @@ To build and run the compiled application:
 ```bash
 npm run build
 npm start
+npm start -- tymanmimo
 ```
 
 To expose the `repogrove` command from a local checkout:
@@ -61,7 +63,12 @@ To expose the `repogrove` command from a local checkout:
 ```bash
 npm link
 repogrove
+repogrove tymanmimo
 ```
+
+When a username is provided, RepoGrove starts the search automatically after
+you choose a token or anonymous access. Successful searches are added to the
+same local history as interactive searches.
 
 RepoGrove requires both stdin and stdout to be attached to a TTY. It cannot
 render through a pipe or redirected output.
@@ -197,6 +204,5 @@ GitHub Actions validates every push and pull request to `main` with:
 - It does not analyze contributions, commits, pull requests, issues, followers,
   or source-code quality.
 - GitHub API rate limits still apply to authenticated requests.
-- The application requires an interactive terminal and does not accept a
-  username as a CLI argument.
+- The application requires an interactive terminal.
 - RepoGrove is currently installed from source and is not published to npm.

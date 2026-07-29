@@ -22,6 +22,7 @@ const { useEffect, useRef, useState } = React;
 type Screen = "welcome" | "workspace";
 
 export interface AppProps {
+  initialUsername?: string;
   environmentToken?: string | null;
   tokenStore?: TokenStore;
   historyStore?: HistoryStore;
@@ -44,6 +45,7 @@ async function loadStatistics(
 }
 
 export function App({
+  initialUsername = "",
   environmentToken = process.env.GITHUB_TOKEN?.trim() || null,
   tokenStore = systemTokenStore,
   historyStore = localHistoryStore,
@@ -53,13 +55,14 @@ export function App({
 }: AppProps) {
   const windowSize = useWindowSize();
   const size = terminalSize ?? windowSize;
+  const normalizedInitialUsername = initialUsername.trim();
   const [screen, setScreen] = useState<Screen>("welcome");
   const [welcomeCanCancel, setWelcomeCanCancel] = useState(false);
   const [focus, setFocus] = useState<WorkspaceFocus>("search");
   const [activeToken, setActiveToken] = useState<string | null>(null);
   const [history, setHistory] = useState<SearchHistoryEntry[]>([]);
   const [historyError, setHistoryError] = useState("");
-  const [username, setUsername] = useState("");
+  const [username, setUsername] = useState(normalizedInitialUsername);
   const [status, setStatus] = useState<ResultStatus>("idle");
   const [statistics, setStatistics] = useState<ProfileStatistics | null>(null);
   const [error, setError] = useState("");
@@ -69,6 +72,7 @@ export function App({
   const searchingRef = useRef(false);
   const historyRevisionRef = useRef(0);
   const suppressInputRef = useRef(false);
+  const initialSearchRef = useRef(normalizedInitialUsername);
 
   useEffect(() => {
     mountedRef.current = true;
@@ -137,7 +141,7 @@ export function App({
     }
   };
 
-  const search = async (value: string) => {
+  const search = async (value: string, token = activeToken) => {
     const normalizedUsername = value.trim();
 
     if (!normalizedUsername || searchingRef.current) {
@@ -155,7 +159,7 @@ export function App({
     try {
       const result = await fetchStatistics(
         normalizedUsername,
-        activeToken,
+        token,
         controller.signal,
       );
 
@@ -218,10 +222,16 @@ export function App({
   };
 
   const completeTokenSetup = (token: string | null) => {
+    const initialSearch = initialSearchRef.current;
+    initialSearchRef.current = "";
     setActiveToken(token);
     setWelcomeCanCancel(false);
     setScreen("workspace");
     setFocus("search");
+
+    if (initialSearch) {
+      void search(initialSearch, token);
+    }
   };
 
   const tokenSetupProps = {
