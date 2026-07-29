@@ -6,6 +6,7 @@
 
 [![CI](https://github.com/tymanmimo/repogrove/actions/workflows/ci.yml/badge.svg)](https://github.com/tymanmimo/repogrove/actions/workflows/ci.yml)
 ![Node.js 22+](https://img.shields.io/badge/Node.js-22%2B-6F9B72)
+[![License: MIT](https://img.shields.io/badge/License-MIT-8FB996.svg)](LICENSE)
 
 RepoGrove is a forest-themed interactive terminal UI for inspecting public
 GitHub profiles. It combines repository statistics, language distribution,
@@ -199,3 +200,7 @@ GitHub Actions validates every push and pull request to `main` with:
 - GitHub API rate limits still apply to authenticated requests.
 - The application requires an interactive terminal.
 - RepoGrove is currently installed from source and is not published to npm.
+
+## License
+
+RepoGrove is available under the [MIT License](LICENSE).
