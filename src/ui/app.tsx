@@ -108,20 +108,26 @@ export function App({
 
   useInput(
     (input, key) => {
-      if (key.tab) {
-        setFocus((current) => (current === "search" ? "history" : "search"));
-        return;
-      }
-
       if (key.ctrl && input === "t") {
         const preservedUsername = username;
         suppressInputRef.current = true;
+
         queueMicrotask(() => {
+          if (!mountedRef.current) {
+            return;
+          }
+
           setUsername(preservedUsername);
           suppressInputRef.current = false;
         });
+
         setWelcomeCanCancel(true);
         setScreen("welcome");
+        return;
+      }
+
+      if (key.tab) {
+        setFocus((current) => (current === "search" ? "history" : "search"));
         return;
       }
 
@@ -246,7 +252,7 @@ export function App({
 
   if (screen === "welcome") {
     return (
-      <WelcomeScreen size={size}>
+      <WelcomeScreen size={size} showLogo={!welcomeCanCancel}>
         <TokenSetup
           {...tokenSetupProps}
           {...(welcomeCanCancel

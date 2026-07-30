@@ -33,7 +33,7 @@ describe("App", () => {
 
     await waitForText(view.lastFrame, "Add GITHUB_TOKEN");
     assert.match(view.lastFrame() ?? "", /REPOGROVE/);
-    assert.match(view.lastFrame() ?? "", /████████████/);
+    assert.match(view.lastFrame() ?? "", /▓{10,}/);
     view.stdin.write("j");
     await waitForText(view.lastFrame, "Continue without a token");
     view.stdin.write("\r");
@@ -304,7 +304,7 @@ describe("App", () => {
       async add(username) {
         return [{ username, searchedAt: "2026-07-28T12:00:00.000Z" }];
       },
-      async clear() {},
+      async clear() { },
     };
     const view = renderApp({
       tokenStore,
@@ -340,9 +340,9 @@ describe("App", () => {
         ];
       },
       async add() {
-        return new Promise(() => {});
+        return new Promise(() => { });
       },
-      async clear() {},
+      async clear() { },
     };
     const view = renderApp({
       initialUsername: "first-user",
@@ -382,7 +382,7 @@ describe("App", () => {
       async add(username) {
         return [{ username, searchedAt: "2026-07-28T12:00:00.000Z" }];
       },
-      async clear() {},
+      async clear() { },
     };
     const view = renderApp({
       tokenStore,
