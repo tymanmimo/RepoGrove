@@ -4,6 +4,9 @@
   "private": true,
   "description": "Explore public GitHub profiles in your terminal",
   "type": "module",
+  "files": [
+    "dist"
+  ],
   "bin": {
     "repogrove": "./dist/cli.js"
   },
